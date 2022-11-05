@@ -10,6 +10,15 @@ import './passport/index.js'
 import { initDriver } from './neo4j.js'
 import { API_PREFIX, JWT_SECRET, NEO4J_PASSWORD, NEO4J_URI, NEO4J_USERNAME } from './constants.js'
 
+console.log({
+  API_PREFIX,
+  JWT_SECRET,
+  NEO4J_PASSWORD,
+  NEO4J_URI,
+  NEO4J_USERNAME,
+})
+
+
 // Create Express instance
 const app = express()
 
