@@ -44,8 +44,24 @@ export default class MovieService {
     // TODO: Execute a query in a new Read Transaction
     // TODO: Get a list of Movies from the Result
     // TODO: Close the session
+    const session = this.driver.session()
+    const cypherQuery = `
+      MATCH (m:Movie)
+      WHERE m.\`${sort}\` IS NOT NULL
+      RETURN m {.*} AS movie
+      ORDER BY m.\`${sort}\` ${order}
+      SKIP $skip
+      LIMIT $limit
+    `
+    const params = {
+      skip: int(skip),
+      limit: int(limit),
+    }
+    const result = await session.executeRead((tx) => tx.run(cypherQuery, params))
+    const movies = result.records.map((record) => toNativeTypes(record.get('movie')))
+    await session.close()
 
-    return popular
+    return movies
   }
   // end::all[]
 

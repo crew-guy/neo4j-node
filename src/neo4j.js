@@ -22,7 +22,7 @@ let driver
 export async function initDriver(uri, username, password) {
   const connectionString = uri
   const authenticationToken = neo4j.auth.basic(username, password)
-  const driver = neo4j.driver(
+  driver = neo4j.driver(
     connectionString, // <1>
     authenticationToken, // <2>
   )

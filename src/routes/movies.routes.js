@@ -30,7 +30,7 @@ router.get('/', async (req, res, next) => {
     const movies = await movieService.all(
       sort, order, limit, skip
     ) // <3>
-
+    console.log(movies)
     res.json(movies)
   }
   catch (e) {
