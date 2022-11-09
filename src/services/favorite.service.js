@@ -53,7 +53,7 @@ export default class FavoriteService {
       LIMIT $limit
       `
       
-    const res = await session.executeWrite(tx => tx.run(listFavoritesQuery, {userId, skip:int(skip), limit:int(limit)}))
+    const res = await session.executeRead(tx => tx.run(listFavoritesQuery, {userId, skip:int(skip), limit:int(limit)}))
     
     // Close session
     await session.close()
@@ -86,18 +86,19 @@ export default class FavoriteService {
     
     // Create HAS_FAVORITE relationship within a Write Transaction
     const addFavouriteQuery = `
-    MATCH (u:User{userId:$userId}), (m:Movie{tmdbId:$movieId})
+    MATCH (u:User{userId:$userId})
+    MATCH (m:Movie{tmdbId:$movieId})
     MERGE (u)-[f:HAS_FAVOURITE]->(m)
     ON CREATE SET f.createdAt = datetime()
     RETURN m {.*, favorite: true} AS movie
     `
     const res = await session.executeWrite((tx) => tx.run(addFavouriteQuery, { userId, movieId }))
-    // Close the session
-    await session.close()
     
     if (res.records.length === 0) {
       throw new NotFoundError('Unable to add favorite')
     }
+    // Close the session
+    await session.close()
     
     // Return movie details and `favorite` property
     const movie = res.records[0].get('movie')
@@ -131,12 +132,13 @@ export default class FavoriteService {
     RETURN m {.*, favorite: false} AS movie
     `
     const res = await session.executeWrite((tx) => tx.run(removeFavouriteQuery, { userId, movieId }))
-    // Close the session
-    await session.close()
     
     if (res.records.length === 0) {
       throw new NotFoundError('Unable to remove favorite')
     }
+    // Close the session
+    await session.close()
+    
     
     // Return movie details and `favorite` property
     const movie = res.records[0].get('movie')
