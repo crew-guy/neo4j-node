@@ -42,29 +42,27 @@ export default class MovieService {
   async all(sort = 'title', order = 'ASC', limit = 6, skip = 0, userId = undefined) {
     // Open an Session
     const session = this.driver.session()
-    const result = await session.executeRead(async (tx) => {
-      const favorites = await this.getUserFavorites(tx, userId)
-      // Execute a query in a new Read Transaction
-      const allMoviesQuery = `
-        MATCH (m:Movie)
-        WHERE m.\`${sort}\` IS NOT NULL
-        RETURN m {
-          .*,
-          favorite: m.tmdbId IN $favorites
-        } AS movie
-        ORDER BY m.\`${sort}\` ${order}
-        SKIP $skip
-        LIMIT $limit
-      `
-      const params = {
-        skip: int(skip),
-        limit: int(limit),
-        favorites
+    // Execute a query in a new Read Transaction
+    const res = await session.executeRead(
+      async tx => {
+        const favorites = await this.getUserFavorites(tx, userId)
+
+        return tx.run(
+          `
+            MATCH (m:Movie)
+            WHERE m.\`${sort}\` IS NOT NULL
+            RETURN m {
+              .*,
+              favorite: m.tmdbId IN $favorites
+            } AS movie
+            ORDER BY m.\`${sort}\` ${order}
+            SKIP $skip
+            LIMIT $limit
+          `, { skip: int(skip), limit: int(limit), favorites })
       }
-      return tx.run(allMoviesQuery, params)
-    })
+    )
     // Get a list of Movies from the Result
-    const movies = result.records.map((record) => toNativeTypes(record.get('movie')))
+    const movies = res.records.map((record) => toNativeTypes(record.get('movie')))
     // Close the session
     await session.close()
 
@@ -231,15 +229,19 @@ export default class MovieService {
     if ( userId === undefined ) {
       return []
     }
-    const userFavoriteMoviesQuery = `
-      MATCH (:User {userId: $userId})-[:HAS_FAVORITE]->(m:Movie) 
-      RETURN m.tmdbId as id
-    `
-    const favoriteResult = await tx.run(userFavoriteMoviesQuery, { userId })
-
+  
+    const favoriteResult = await tx.run(
+      `
+        MATCH (:User {userId: $userId})-[:HAS_FAVORITE]->(m)
+        RETURN m.tmdbId AS id
+      `,
+      { userId, }
+    )
+  
     // Extract the `id` value returned by the cypher query
-    const favoriteMovieIds = favoriteResult.records.map(row => row.get('id'))
-    return favoriteMovieIds
+    return favoriteResult.records.map(
+      row => row.get('id')
+    )
   }
   // end::getUserFavorites[]
 
