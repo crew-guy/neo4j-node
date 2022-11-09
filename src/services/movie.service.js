@@ -40,25 +40,32 @@ export default class MovieService {
    */
   // tag::all[]
   async all(sort = 'title', order = 'ASC', limit = 6, skip = 0, userId = undefined) {
-    // TODO: Open an Session
-    // TODO: Execute a query in a new Read Transaction
-    // TODO: Get a list of Movies from the Result
-    // TODO: Close the session
+    // Open an Session
     const session = this.driver.session()
-    const cypherQuery = `
-      MATCH (m:Movie)
-      WHERE m.\`${sort}\` IS NOT NULL
-      RETURN m {.*} AS movie
-      ORDER BY m.\`${sort}\` ${order}
-      SKIP $skip
-      LIMIT $limit
-    `
-    const params = {
-      skip: int(skip),
-      limit: int(limit),
-    }
-    const result = await session.executeRead((tx) => tx.run(cypherQuery, params))
+    const result = await session.executeRead(async (tx) => {
+      const favorites = await this.getUserFavorites(tx, userId)
+      // Execute a query in a new Read Transaction
+      const allMoviesQuery = `
+        MATCH (m:Movie)
+        WHERE m.\`${sort}\` IS NOT NULL
+        RETURN m {
+          .*,
+          favorite: m.tmdbId IN $favorites
+        } AS movie
+        ORDER BY m.\`${sort}\` ${order}
+        SKIP $skip
+        LIMIT $limit
+      `
+      const params = {
+        skip: int(skip),
+        limit: int(limit),
+        favorites
+      }
+      return tx.run(allMoviesQuery, params)
+    })
+    // Get a list of Movies from the Result
     const movies = result.records.map((record) => toNativeTypes(record.get('movie')))
+    // Close the session
     await session.close()
 
     return movies
@@ -220,7 +227,19 @@ export default class MovieService {
    */
   // tag::getUserFavorites[]
   async getUserFavorites(tx, userId) {
-    return []
+    // If userId is not defined, return an empty array
+    if ( userId === undefined ) {
+      return []
+    }
+    const userFavoriteMoviesQuery = `
+      MATCH (:User {userId: $userId})-[:HAS_FAVORITE]->(m:Movie) 
+      RETURN m.tmdbId as id
+    `
+    const favoriteResult = await tx.run(userFavoriteMoviesQuery, { userId })
+
+    // Extract the `id` value returned by the cypher query
+    const favoriteMovieIds = favoriteResult.records.map(row => row.get('id'))
+    return favoriteMovieIds
   }
   // end::getUserFavorites[]
 
