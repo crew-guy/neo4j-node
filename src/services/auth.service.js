@@ -100,17 +100,29 @@ export default class AuthService {
    */
   // tag::authenticate[]
   async authenticate(email, unencryptedPassword) {
-    // TODO: Authenticate the user from the database
-    if (email === 'graphacademy@neo4j.com' && unencryptedPassword === 'letmein') {
-      const { password, ...claims } = user.properties
-
-      return {
-        ...claims,
-        token: jwt.sign(claims, JWT_SECRET)
+    // Find the user by email & if this user exists, compare the password
+    const findUserQuery = 'MATCH (u:User{email: $email}) RETURN u'
+    const session = this.driver.session()
+    const res = await session.executeRead(tx => tx.run(
+      findUserQuery, {
+        email
       }
+    ))
+    await session.close()
+    // Verify the user exists
+    if ( res.records.length === 0 ) {
+      return false
     }
-
-    return false
+    const user = res.records[0].get('u')
+    const {password, ...safeProperties} = user.properties
+    const correct = await compare(unencryptedPassword, password)
+    if (correct === false) {
+      return false
+    }
+    return {
+      ...safeProperties,
+      token: jwt.sign(this.userToClaims(safeProperties), JWT_SECRET),
+    }
   }
   // end::authenticate[]
 
